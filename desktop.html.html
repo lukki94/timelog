@@ -1,0 +1,2100 @@
+<!DOCTYPE html>
+<html lang="de" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TimeLog v1.3.0 – Arbeitszeiterfassung</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Font Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Chart.js for Dashboard Statistics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        .custom-scrollbar::-webkit-scrollbar {
+            height: 6px;
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(200, 200, 200, 0.15);
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(150, 150, 150, 0.4);
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: rgba(150, 150, 150, 0.6);
+        }
+    </style>
+</head>
+<body class="h-full font-sans text-slate-800 dark:text-slate-100 bg-slate-100 dark:bg-slate-900 flex flex-col antialiased transition-colors duration-200">
+
+    <!-- HIDDEN UNIFIED FILE INPUT -->
+    <input type="file" id="unifiedFileInput" accept=".json,.csv" onchange="handleFileSelected(event)" class="hidden">
+
+    <header class="bg-slate-900 dark:bg-slate-950 text-white shadow-xl sticky top-0 z-30 border-b border-slate-800 dark:border-slate-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                
+                <!-- Logo & Year Selector -->
+                <div class="flex items-center space-x-3">
+                    <div class="bg-indigo-600 text-white p-2.5 rounded-xl shadow-md flex items-center justify-center">
+                        <i class="fa-solid fa-stopwatch text-xl"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center space-x-2">
+                            <h1 class="font-bold text-lg leading-tight tracking-tight text-white flex items-center gap-1.5">
+                                TimeLog <span class="text-xs bg-indigo-500/30 text-indigo-200 font-semibold px-2 py-0.5 rounded-md border border-indigo-400/30">v1.3.0</span>
+                            </h1>
+                            <div class="relative inline-block">
+                                <select id="yearSelect" onchange="changeYear(parseInt(this.value))" class="bg-indigo-600/30 text-indigo-200 text-xs font-bold px-2.5 py-1 rounded-lg border border-indigo-400/40 focus:outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer hover:bg-indigo-600/50 transition">
+                                    <option value="2024" class="bg-slate-900 text-white">2024</option>
+                                    <option value="2025" class="bg-slate-900 text-white">2025</option>
+                                    <option value="2026" class="bg-slate-900 text-white" selected>2026</option>
+                                    <option value="2027" class="bg-slate-900 text-white">2027</option>
+                                    <option value="2028" class="bg-slate-900 text-white">2028</option>
+                                    <option value="2029" class="bg-slate-900 text-white">2029</option>
+                                    <option value="2030" class="bg-slate-900 text-white">2030</option>
+                                </select>
+                            </div>
+                        </div>
+                        <p class="text-xs text-slate-400 hidden sm:block">Persönliches Stundenkonto • Hessen Feiertage</p>
+                    </div>
+                </div>
+
+                <!-- Views Switcher & Data Controls -->
+                <div class="flex items-center space-x-2 sm:space-x-3">
+                    <div class="bg-slate-800/90 dark:bg-slate-900 p-1 rounded-xl border border-slate-700 flex text-xs font-medium">
+                        <button id="navMonthBtn" onclick="switchView('month')" class="px-3 py-1.5 rounded-lg transition bg-indigo-600 text-white shadow">
+                            <i class="fa-solid fa-calendar-day mr-1"></i><span class="hidden sm:inline">Monat</span>
+                        </button>
+                        <button id="navYearBtn" onclick="switchView('year')" class="px-3 py-1.5 rounded-lg transition text-slate-300 hover:text-white hover:bg-slate-700">
+                            <i class="fa-solid fa-calendar-days mr-1"></i><span class="hidden sm:inline">Jahr</span>
+                        </button>
+                        <button id="navStatsBtn" onclick="switchView('stats')" class="px-3 py-1.5 rounded-lg transition text-slate-300 hover:text-white hover:bg-slate-700">
+                            <i class="fa-solid fa-chart-pie mr-1"></i><span class="hidden sm:inline">Statistik</span>
+                        </button>
+                    </div>
+
+                    <div class="h-6 w-px bg-slate-800 hidden md:block"></div>
+
+                    <!-- File Actions -->
+                    <button onclick="openFilePicker()" class="bg-slate-800 hover:bg-slate-700 text-indigo-300 text-xs font-semibold px-3 py-2 rounded-xl transition border border-slate-700 flex items-center shadow-xs" title="Sicherung (JSON Desktop/Mobile) oder Excel (CSV) öffnen">
+                        <i class="fa-solid fa-folder-open mr-1.5 text-indigo-400"></i><span class="hidden lg:inline">Datei öffnen</span>
+                    </button>
+
+                    <button onclick="saveDatabaseJSON()" class="bg-indigo-700 hover:bg-indigo-600 text-white text-xs font-semibold px-3 py-2 rounded-xl transition shadow flex items-center" title="Gesamte Datenbank als JSON speichern">
+                        <i class="fa-solid fa-floppy-disk mr-1.5"></i><span class="hidden lg:inline">Speichern</span>
+                    </button>
+
+                    <button onclick="exportCSV()" class="bg-slate-800 hover:bg-slate-700 text-emerald-400 text-xs font-semibold px-3 py-2 rounded-xl transition border border-slate-700 flex items-center shadow-xs" title="Aktuelles Jahr als CSV herunterladen">
+                        <i class="fa-solid fa-file-csv mr-1.5"></i><span class="hidden lg:inline">CSV Export</span>
+                    </button>
+
+                    <div class="h-6 w-px bg-slate-800 hidden md:block"></div>
+
+                    <!-- Multi-day Vacation Period Button -->
+                    <button onclick="openVacationPeriodModal()" class="bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold px-3 py-2 rounded-xl transition shadow flex items-center" title="Urlaub über mehrere Tage eintragen">
+                        <i class="fa-solid fa-plane-departure mr-1.5"></i><span class="hidden md:inline">+ Urlaub</span>
+                    </button>
+
+                    <!-- Single Day Time Entry Button -->
+                    <button onclick="openModalWithDate()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-3.5 py-2 rounded-xl transition shadow flex items-center">
+                        <i class="fa-solid fa-plus mr-1.5"></i><span>+ Zeit</span>
+                    </button>
+
+                    <!-- Dark Mode Toggle Button -->
+                    <button onclick="toggleTheme()" id="themeToggleBtn" title="Dunkel-/Hellmodus umschalten" class="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl border border-slate-700 transition flex items-center justify-center">
+                        <i id="themeIcon" class="fa-solid fa-moon text-amber-400"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <section id="monthTabsSection" class="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 shadow-xs py-2.5 px-4 sm:px-6 lg:px-8 transition-colors">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-3">
+            
+            <!-- Month Selection Tabs -->
+            <div class="flex items-center space-x-1 overflow-x-auto pb-1 md:pb-0 custom-scrollbar" id="monthTabsContainer"></div>
+
+            <!-- Single Clean Reset Control -->
+            <div class="flex items-center justify-end">
+                <button onclick="openResetConfirmModal()" title="Einträge für dieses Jahr zurücksetzen" class="px-2.5 py-1.5 bg-slate-100 hover:bg-rose-50 dark:bg-slate-700 dark:hover:bg-rose-950/40 text-slate-600 hover:text-rose-600 dark:text-slate-300 dark:hover:text-rose-400 text-xs font-semibold rounded-lg border border-slate-300 dark:border-slate-600 transition flex items-center">
+                    <i class="fa-solid fa-rotate-left mr-1"></i>Jahr zurücksetzen
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <div id="monthSummaryBar" class="bg-slate-800 dark:bg-slate-950 text-white px-4 sm:px-6 py-2.5 text-xs">
+        <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
+            <div class="flex items-center space-x-2">
+                <span id="activeMonthTitle" class="font-bold text-sm text-indigo-300">Januar 2026</span>
+                <span class="text-slate-500">|</span>
+                <span id="monthWorkdaysCount" class="text-slate-300 font-medium">-- Erfasste Tage</span>
+            </div>
+
+            <!-- Month KPIs -->
+            <div class="flex items-center space-x-6 text-xs flex-wrap gap-y-1">
+                <div>
+                    <span class="text-slate-400">Soll (erfasst):</span>
+                    <span id="metricMonthSoll" class="font-bold ml-1 text-slate-200">0,0 h</span>
+                </div>
+                <div>
+                    <span class="text-slate-400">Ist-Zeit:</span>
+                    <span id="metricMonthIst" class="font-bold ml-1 text-emerald-400">0,0 h</span>
+                </div>
+                <div>
+                    <span class="text-slate-400">Überstunden (Monat):</span>
+                    <span id="metricMonthDiff" class="font-bold ml-1 px-2 py-0.5 rounded text-white">0,0 h</span>
+                </div>
+                <div class="hidden sm:block">
+                    <span class="text-slate-400">Homeoffice:</span>
+                    <span id="metricMonthHO" class="font-bold ml-1 text-blue-300">0 Tage</span>
+                </div>
+                <div class="hidden sm:block">
+                    <span class="text-slate-400">Urlaub:</span>
+                    <span id="metricMonthUrlaub" class="font-bold ml-1 text-amber-300">0 Tage</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 overflow-hidden flex flex-col">
+        
+        <!-- VIEW 1: MONTHLY TIME LOG TABLE -->
+        <div id="monthViewContainer" class="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col flex-1 transition-colors">
+            <div class="p-2.5 bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 text-xs text-slate-500 dark:text-slate-400 flex items-center justify-between flex-wrap gap-2">
+                <span><i class="fa-solid fa-hand-pointer text-indigo-500 mr-1.5"></i>Klicke auf eine Zeile, um Zeiten zu bearbeiten.</span>
+                <span class="text-indigo-800 dark:text-indigo-300 font-semibold bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 rounded border border-indigo-200 dark:border-indigo-800"><i class="fa-solid fa-mobile-screen-button mr-1"></i>Universal Desktop / Mobile Sync v1.3.0</span>
+            </div>
+            <div class="overflow-x-auto custom-scrollbar flex-1">
+                <table class="w-full text-xs text-left border-collapse" id="monthTable">
+                    <thead>
+                        <tr class="bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-200 font-bold border-b border-slate-300 dark:border-slate-700 sticky top-0 z-10 shadow-xs">
+                            <th class="p-2.5 w-16 text-center bg-amber-100 dark:bg-amber-950/80 text-amber-900 dark:text-amber-200 border-r border-amber-300 dark:border-amber-800 font-extrabold">KW</th>
+                            <th class="p-2.5 w-24 border-r border-slate-200 dark:border-slate-700">Datum</th>
+                            <th class="p-2.5 w-24 border-r border-slate-200 dark:border-slate-700">Tag</th>
+                            <th class="p-2.5 w-32 border-r border-slate-200 dark:border-slate-700">Status</th>
+                            <th class="p-2.5 w-20 text-center border-r border-slate-200 dark:border-slate-700">Start</th>
+                            <th class="p-2.5 w-20 text-center border-r border-slate-200 dark:border-slate-700">Ende</th>
+                            <th class="p-2.5 w-20 text-center border-r border-slate-200 dark:border-slate-700">Pause</th>
+                            <th class="p-2.5 w-24 text-right border-r border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">Ist-Zeit</th>
+                            <th class="p-2.5 w-24 text-right border-r border-slate-200 dark:border-slate-700">Soll-Zeit</th>
+                            <th class="p-2.5 w-24 text-right border-r border-slate-200 dark:border-slate-700">Differenz</th>
+                            <th class="p-2.5 border-r border-slate-200 dark:border-slate-700 min-w-[150px]">Notiz / Aufgabe</th>
+                            <th class="p-2.5 w-20 text-center">Aktionen</th>
+                        </tr>
+                    </thead>
+                    <tbody id="monthTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- VIEW 2: FULL YEAR OVERVIEW -->
+        <div id="yearViewContainer" class="overflow-y-auto flex-1 hidden pr-1 custom-scrollbar">
+            <div class="mb-3 p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs flex flex-wrap items-center justify-between gap-3 shadow-xs">
+                <div class="flex items-center space-x-3 flex-wrap gap-y-1">
+                    <span class="font-bold text-slate-700 dark:text-slate-200">Status-Legende:</span>
+                    <span class="px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-semibold border border-emerald-300 dark:border-emerald-800">Urlaub</span>
+                    <span class="px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 font-semibold border border-blue-300 dark:border-blue-800">Homeoffice</span>
+                    <span class="px-2 py-0.5 rounded bg-indigo-100 dark:bg-indigo-950 text-indigo-800 dark:text-indigo-300 font-semibold border border-indigo-300 dark:border-indigo-800">Büro / Dienst</span>
+                    <span class="px-2 py-0.5 rounded bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300 font-semibold border border-rose-300 dark:border-rose-800">Feiertag (Hessen)</span>
+                    <span class="px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 font-semibold border border-amber-300 dark:border-amber-800">Zeitausgleich</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button onclick="openVacationPeriodModal()" class="px-3 py-1 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-semibold shadow transition flex items-center">
+                        <i class="fa-solid fa-umbrella-beach mr-1.5"></i>+ Urlaub eintragen (Zeitraum)
+                    </button>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" id="yearGridContainer"></div>
+        </div>
+
+        <!-- VIEW 3: STATS DASHBOARD -->
+        <div id="statsViewContainer" class="overflow-y-auto flex-1 hidden space-y-6 custom-scrollbar pr-1">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 shadow-sm transition-colors">
+                    <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
+                        <span class="text-xs font-bold uppercase tracking-wider">Überstundenkonto</span>
+                        <div class="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                            <i class="fa-solid fa-scale-balanced"></i>
+                        </div>
+                    </div>
+                    <div class="text-3xl font-black" id="statOvertimeTotal">0,0 h</div>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Geleistete Über/Unterstunden (<span id="statYearLabel1">2026</span>)</p>
+                </div>
+
+                <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 shadow-sm transition-colors">
+                    <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
+                        <span class="text-xs font-bold uppercase tracking-wider">Geleistete Ist-Stunden</span>
+                        <div class="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                            <i class="fa-solid fa-clock"></i>
+                        </div>
+                    </div>
+                    <div class="text-2xl font-extrabold text-slate-900 dark:text-white" id="statIstTotal">0,0 h</div>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Soll-Zeit erfasster Tage: <span id="statSollTotal" class="font-semibold text-slate-700 dark:text-slate-300">0,0 h</span></p>
+                </div>
+
+                <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 shadow-sm transition-colors">
+                    <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
+                        <span class="text-xs font-bold uppercase tracking-wider">Urlaubstage <span id="statYearLabel2">2026</span></span>
+                        <div class="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                            <i class="fa-solid fa-umbrella-beach"></i>
+                        </div>
+                    </div>
+                    <div class="flex items-baseline space-x-2">
+                        <span class="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400" id="statVacationRemaining">0</span>
+                        <span class="text-xs text-slate-500 dark:text-slate-400 font-semibold">Tage verbleibend</span>
+                    </div>
+                    <div class="mt-2 pt-2 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between text-xs text-slate-600 dark:text-slate-300">
+                        <span>Anspruch: 
+                            <input type="number" id="vacationEntitlementInput" min="0" max="100" value="30" onchange="updateVacationEntitlement(this.value)" class="w-12 border border-slate-300 dark:border-slate-600 rounded px-1 text-center font-bold text-slate-800 dark:text-white bg-slate-50 dark:bg-slate-700">
+                        </span>
+                        <span>Genommen: <strong id="statVacationUsed" class="text-amber-600 dark:text-amber-400">0</strong></span>
+                    </div>
+                </div>
+
+                <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 shadow-sm transition-colors">
+                    <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
+                        <span class="text-xs font-bold uppercase tracking-wider">Homeoffice-Quote</span>
+                        <div class="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                            <i class="fa-solid fa-house-laptop"></i>
+                        </div>
+                    </div>
+                    <div class="text-2xl font-extrabold text-blue-600 dark:text-blue-400" id="statHomeofficeRate">0%</div>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                        <span id="statHomeofficeTotal" class="font-semibold text-slate-700 dark:text-slate-300">0 HO-Tage</span> von <span id="statActualWorkdaysTotal" class="font-semibold text-slate-700 dark:text-slate-300">0 Arbeitstagen</span>
+                    </p>
+                </div>
+            </div>
+
+            <!-- ZEITKONTO TREND CHART -->
+            <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 shadow-sm flex flex-col transition-colors">
+                <h3 class="font-bold text-slate-800 dark:text-slate-100 text-sm mb-4 flex items-center justify-between">
+                    <span class="flex items-center"><i class="fa-solid fa-chart-line mr-2 text-indigo-600 dark:text-indigo-400"></i>Zeitkonto-Verlauf (Kumulierte Über- / Unterstunden)</span>
+                    <span id="statZeitkontoLastLoggedLabel" class="text-xs font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-2.5 py-1 rounded-lg border border-indigo-200 dark:border-indigo-800"></span>
+                </h3>
+                <div class="flex-1 min-h-[260px] relative">
+                    <canvas id="chartZeitkontoTrend"></canvas>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 shadow-sm flex flex-col transition-colors">
+                    <h3 class="font-bold text-slate-800 dark:text-slate-100 text-sm mb-4 flex items-center justify-between">
+                        <span class="flex items-center"><i class="fa-solid fa-chart-column mr-2 text-indigo-600 dark:text-indigo-400"></i>Monatlicher Stunden-Vergleich (Soll vs. Ist)</span>
+                    </h3>
+                    <div class="flex-1 min-h-[260px] relative">
+                        <canvas id="chartMonthlyHours"></canvas>
+                    </div>
+                </div>
+
+                <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 shadow-sm flex flex-col transition-colors">
+                    <h3 class="font-bold text-slate-800 dark:text-slate-100 text-sm mb-4 flex items-center justify-between">
+                        <span class="flex items-center"><i class="fa-solid fa-chart-pie mr-2 text-indigo-600 dark:text-indigo-400"></i>Arbeitstage-Verteilung</span>
+                    </h3>
+                    <div class="flex-1 min-h-[260px] relative flex items-center justify-center">
+                        <canvas id="chartStatusBreakdown"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- ENTRY MODAL -->
+    <div id="entryModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4 overflow-y-auto">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-100 dark:border-slate-700 my-8 transition-colors">
+            
+            <div class="bg-slate-900 dark:bg-slate-950 text-white px-6 py-4 flex items-center justify-between">
+                <div>
+                    <h3 class="font-bold text-base flex items-center">
+                        <i class="fa-solid fa-clock-rotate-left mr-2 text-indigo-400"></i>
+                        Arbeitszeit eintragen
+                    </h3>
+                    <p id="modalKWInfo" class="text-xs text-indigo-200 font-semibold mt-0.5">KW --</p>
+                </div>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-white text-lg transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form id="entryForm" onsubmit="saveModalEntry(event)" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
+                        <span><i class="fa-solid fa-calendar-day mr-1 text-indigo-600 dark:text-indigo-400"></i>Datum auswählen *</span>
+                        <span id="modalDayOfWeekLabel" class="text-xs text-indigo-600 dark:text-indigo-400 font-semibold"></span>
+                    </label>
+                    <input type="date" id="modalDateInput" onchange="handleModalDateChange()" required class="w-full text-sm border border-slate-300 dark:border-slate-600 rounded-xl p-2.5 font-semibold text-slate-800 dark:text-white focus:ring-2 focus:ring-indigo-500 bg-indigo-50/30 dark:bg-slate-700">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Status / Kategorie *</label>
+                    <select id="modalStatus" onchange="handleStatusChange()" required class="w-full text-sm border border-slate-300 dark:border-slate-600 rounded-xl p-2.5 focus:ring-2 focus:ring-indigo-500 bg-slate-50 dark:bg-slate-700 dark:text-white">
+                        <option value="Büro">🏢 Büro (Vor-Ort)</option>
+                        <option value="Homeoffice">🏠 Homeoffice</option>
+                        <option value="Dienstreise">🚗 Dienstreise / Kunde</option>
+                        <option value="Urlaub">🏖️ Urlaub</option>
+                        <option value="Krankheit">🤒 Krankheit</option>
+                        <option value="Feiertag">🎉 Feiertag (Hessen)</option>
+                        <option value="Zeitausgleich">⚖ Zeitausgleich (Gleitzeit-Abbau)</option>
+                        <option value="Offen">⚪ Offen / Unbegründet</option>
+                        <option value="Wochenende">🛋️ Wochenende</option>
+                    </select>
+                </div>
+
+                <div id="timeInputsContainer" class="grid grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Beginn</label>
+                        <input type="time" id="modalStart" oninput="calculateModalDiff()" class="w-full text-sm border border-slate-300 dark:border-slate-600 rounded-xl p-2 focus:ring-2 focus:ring-indigo-500 dark:bg-slate-700 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Ende</label>
+                        <input type="time" id="modalEnd" oninput="calculateModalDiff()" class="w-full text-sm border border-slate-300 dark:border-slate-600 rounded-xl p-2 focus:ring-2 focus:ring-indigo-500 dark:bg-slate-700 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Pause (Min)</label>
+                        <input type="number" id="modalBreak" min="0" step="5" oninput="calculateModalDiff()" class="w-full text-sm border border-slate-300 dark:border-slate-600 rounded-xl p-2 focus:ring-2 focus:ring-indigo-500 dark:bg-slate-700 dark:text-white">
+                    </div>
+                </div>
+
+                <div class="bg-slate-50 dark:bg-slate-700/50 p-3 rounded-xl border border-slate-200 dark:border-slate-600 grid grid-cols-3 gap-2 text-center text-xs">
+                    <div>
+                        <span class="block text-slate-500 dark:text-slate-400 font-medium">Soll-Zeit</span>
+                        <input type="number" id="modalSoll" step="0.5" min="0" max="24" oninput="calculateModalDiff()" class="w-16 mx-auto text-center font-bold text-slate-800 dark:text-white bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded mt-0.5 p-0.5">
+                    </div>
+                    <div>
+                        <span class="block text-slate-500 dark:text-slate-400 font-medium">Ist-Zeit</span>
+                        <span id="modalIstDisplay" class="block font-extrabold text-sm text-slate-900 dark:text-white mt-1">0,0 h</span>
+                    </div>
+                    <div>
+                        <span class="block text-slate-500 dark:text-slate-400 font-medium">Differenz</span>
+                        <span id="modalDiffDisplay" class="block font-extrabold text-sm text-slate-400 mt-1">0,0 h</span>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Notiz / Aufgabendetails</label>
+                    <input type="text" id="modalNote" placeholder="z. B. Projekt Alpha, Kundentermin..." class="w-full text-sm border border-slate-300 dark:border-slate-600 rounded-xl p-2.5 focus:ring-2 focus:ring-indigo-500 dark:bg-slate-700 dark:text-white">
+                </div>
+
+                <div class="bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 p-2.5 rounded-xl flex items-center justify-between">
+                    <span class="text-xs text-indigo-900 dark:text-indigo-200 font-medium"><i class="fa-solid fa-copy text-indigo-600 dark:text-indigo-400 mr-1.5"></i>Diesen Tag kopieren?</span>
+                    <button type="button" onclick="openCopyModalFromEntryModal()" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg shadow-xs transition">
+                        Auf weitere Tage kopieren
+                    </button>
+                </div>
+
+                <div class="pt-2 flex items-center justify-between border-t border-slate-100 dark:border-slate-700">
+                    <button type="button" onclick="clearDayEntry()" class="text-xs text-rose-600 hover:text-rose-800 dark:text-rose-400 font-semibold flex items-center">
+                        <i class="fa-solid fa-eraser mr-1"></i>Eintrag leeren
+                    </button>
+                    <div class="flex space-x-2">
+                        <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition">
+                            Abbrechen
+                        </button>
+                        <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow transition">
+                            Speichern
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- COPY MODAL -->
+    <div id="copyModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4 overflow-y-auto">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-100 dark:border-slate-700 my-8 transition-colors">
+            
+            <div class="bg-indigo-700 dark:bg-indigo-900 text-white px-6 py-4 flex items-center justify-between">
+                <div>
+                    <h3 class="font-bold text-base flex items-center">
+                        <i class="fa-solid fa-copy mr-2"></i>
+                        Tag auf weitere Tage kopieren
+                    </h3>
+                    <p id="copySourceLabel" class="text-xs text-indigo-200 mt-0.5">Kopiere Einstellungen von: --</p>
+                </div>
+                <button onclick="closeCopyModal()" class="text-indigo-200 hover:text-white text-lg transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="p-6 space-y-4">
+                <div id="copySummaryBadge" class="bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800 p-3 rounded-xl text-xs text-indigo-950 dark:text-indigo-200 font-medium"></div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">Schnellauswahl für Ziel-Tage:</label>
+                    <div class="flex flex-wrap gap-1.5 text-xs">
+                        <button type="button" onclick="presetCopySelection('week_workdays')" class="px-2.5 py-1 bg-slate-100 dark:bg-slate-700 hover:bg-indigo-100 text-slate-700 dark:text-slate-200 hover:text-indigo-800 font-semibold rounded-lg border border-slate-200 dark:border-slate-600 transition">
+                            📅 Mo-Fr dieser Woche
+                        </button>
+                        <button type="button" onclick="presetCopySelection('rest_of_week')" class="px-2.5 py-1 bg-slate-100 dark:bg-slate-700 hover:bg-indigo-100 text-slate-700 dark:text-slate-200 hover:text-indigo-800 font-semibold rounded-lg border border-slate-200 dark:border-slate-600 transition">
+                            ⏩ Restliche Werktage der Woche
+                        </button>
+                        <button type="button" onclick="presetCopySelection('same_day_of_month')" class="px-2.5 py-1 bg-slate-100 dark:bg-slate-700 hover:bg-indigo-100 text-slate-700 dark:text-slate-200 hover:text-indigo-800 font-semibold rounded-lg border border-slate-200 dark:border-slate-600 transition" id="presetSameDayBtn">
+                            📆 Alle [Wochentag] des Monats
+                        </button>
+                        <button type="button" onclick="presetCopySelection('month_workdays')" class="px-2.5 py-1 bg-slate-100 dark:bg-slate-700 hover:bg-indigo-100 text-slate-700 dark:text-slate-200 hover:text-indigo-800 font-semibold rounded-lg border border-slate-200 dark:border-slate-600 transition">
+                            🏢 Alle Werktage im Monat
+                        </button>
+                        <button type="button" onclick="presetCopySelection('clear_all')" class="px-2.5 py-1 bg-slate-100 dark:bg-slate-700 hover:bg-rose-100 text-slate-600 dark:text-slate-300 hover:text-rose-700 font-semibold rounded-lg border border-slate-200 dark:border-slate-600 transition">
+                            ❌ Auswahl aufheben
+                        </button>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="flex items-center justify-between mb-1.5">
+                        <label class="text-xs font-bold text-slate-700 dark:text-slate-300">Tage des aktiven Monats wählen:</label>
+                        <span id="selectedDaysCounter" class="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded border border-indigo-200 dark:border-indigo-800">0 Tage gewählt</span>
+                    </div>
+                    
+                    <div id="copyDaysGrid" class="max-h-56 overflow-y-auto custom-scrollbar border border-slate-200 dark:border-slate-700 rounded-xl p-2 bg-slate-50/50 dark:bg-slate-900/50 space-y-1"></div>
+                </div>
+
+                <div class="pt-3 flex items-center justify-between border-t border-slate-100 dark:border-slate-700">
+                    <button type="button" onclick="closeCopyModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition">
+                        Abbrechen
+                    </button>
+                    <button type="button" onclick="executeCopyData()" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow transition flex items-center">
+                        <i class="fa-solid fa-check mr-1.5"></i>
+                        <span id="copyApplyBtnText">Auf ausgewählte Tage anwenden</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- VACATION PERIOD MODAL -->
+    <div id="vacationPeriodModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4 overflow-y-auto">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-100 dark:border-slate-700 my-8 transition-colors">
+            <div class="bg-amber-600 dark:bg-amber-700 text-white px-6 py-4 flex items-center justify-between">
+                <div>
+                    <h3 class="font-bold text-base flex items-center">
+                        <i class="fa-solid fa-plane-departure mr-2"></i>
+                        Urlaub / Zeitraum eintragen
+                    </h3>
+                    <p class="text-xs text-amber-100 mt-0.5">Wochenenden & Feiertage werden übersprungen</p>
+                </div>
+                <button onclick="closeVacationPeriodModal()" class="text-amber-200 hover:text-white text-lg transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form onsubmit="saveVacationPeriod(event)" class="p-6 space-y-4">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Startdatum *</label>
+                        <input type="date" id="vacationStartInput" onchange="previewVacationDaysCount()" required class="w-full text-sm border border-slate-300 dark:border-slate-600 rounded-xl p-2.5 font-semibold text-slate-800 dark:text-white focus:ring-2 focus:ring-amber-500 bg-amber-50/20 dark:bg-slate-700">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Enddatum *</label>
+                        <input type="date" id="vacationEndInput" onchange="previewVacationDaysCount()" required class="w-full text-sm border border-slate-300 dark:border-slate-600 rounded-xl p-2.5 font-semibold text-slate-800 dark:text-white focus:ring-2 focus:ring-amber-500 bg-amber-50/20 dark:bg-slate-700">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Status / Typ *</label>
+                    <select id="vacationStatusSelect" onchange="previewVacationDaysCount()" class="w-full text-sm border border-slate-300 dark:border-slate-600 rounded-xl p-2.5 focus:ring-2 focus:ring-amber-500 bg-slate-50 dark:bg-slate-700 dark:text-white">
+                        <option value="Urlaub">🏖️ Urlaub</option>
+                        <option value="Homeoffice">🏠 Homeoffice</option>
+                        <option value="Dienstreise">🚗 Dienstreise / Kunde</option>
+                        <option value="Krankheit">🤒 Krankheit</option>
+                        <option value="Zeitausgleich">⚖️ Zeitausgleich (Gleitzeit-Abbau)</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Bezeichnung / Notiz</label>
+                    <input type="text" id="vacationNoteInput" placeholder="z. B. Sommerurlaub..." class="w-full text-sm border border-slate-300 dark:border-slate-600 rounded-xl p-2.5 focus:ring-2 focus:ring-amber-500 dark:bg-slate-700 dark:text-white">
+                </div>
+
+                <div class="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 p-3 rounded-xl text-xs text-amber-900 dark:text-amber-200 flex items-center justify-between">
+                    <span><i class="fa-solid fa-calendar-check mr-1.5 text-amber-600 dark:text-amber-400"></i>Werktage im Zeitraum:</span>
+                    <strong id="vacationDaysPreview" class="text-sm text-amber-900 dark:text-amber-200 font-extrabold">0 Tage</strong>
+                </div>
+
+                <div class="pt-3 flex items-center justify-end space-x-2 border-t border-slate-100 dark:border-slate-700">
+                    <button type="button" onclick="closeVacationPeriodModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition">
+                        Abbrechen
+                    </button>
+                    <button type="submit" class="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold shadow transition">
+                        Zeitraum buchen
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- RESET CONFIRMATION MODAL -->
+    <div id="confirmModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-4 border border-slate-100 dark:border-slate-700 transition-colors">
+            <div class="text-center">
+                <div class="w-12 h-12 bg-rose-100 dark:bg-rose-950 text-rose-600 dark:text-rose-400 rounded-full flex items-center justify-center mx-auto mb-3 text-xl">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+                <h3 class="font-bold text-base text-slate-900 dark:text-white">Jahr <span id="resetYearDisplay">2026</span> zurücksetzen?</h3>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Möchtest du wirklich alle eingetragenen Arbeitszeiten für dieses Jahr löschen?</p>
+            </div>
+            <div class="flex items-center space-x-2 pt-2">
+                <button onclick="closeResetConfirmModal()" class="flex-1 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold transition">
+                    Abbrechen
+                </button>
+                <button onclick="executeResetData()" class="flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-semibold shadow transition">
+                    Ja, zurücksetzen
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST NOTIFICATION CONTAINER -->
+    <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+    <script>
+        let currentYear = 2026;
+        let currentMonth = 0; // 0 = Jan, 11 = Dec
+        let activeView = 'month';
+        let chartMonthlyInstance = null;
+        let chartStatusInstance = null;
+        let chartZeitkontoInstance = null;
+
+        // GLOBAL MULTI-YEAR DATABASE SCHEMA (TimeLog v1.3.0)
+        let timelogDB = {
+            appName: "TimeLog v1.3.0",
+            version: "1.3.0",
+            lastModified: new Date().toISOString(),
+            vacationEntitlement: {}, // Indexed by year string, e.g., "2026": 30
+            years: {}                // Indexed by year string -> object of ISO dates 'YYYY-MM-DD'
+        };
+
+        let copySourceData = null;
+
+        const monthNames = [
+            "Januar", "Februar", "März", "April", "Mai", "Juni",
+            "Juli", "August", "September", "Oktober", "November", "Dezember"
+        ];
+
+        const dayNamesDE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+
+        // Theme Toggle
+        function initTheme() {
+            const savedTheme = localStorage.getItem('timelog_theme') || 'light';
+            applyTheme(savedTheme);
+        }
+
+        function toggleTheme() {
+            const isDark = document.documentElement.classList.contains('dark');
+            applyTheme(isDark ? 'light' : 'dark');
+        }
+
+        function applyTheme(theme) {
+            const icon = document.getElementById('themeIcon');
+            if (theme === 'dark') {
+                document.documentElement.classList.add('dark');
+                if (icon) icon.className = 'fa-solid fa-sun text-amber-400';
+            } else {
+                document.documentElement.classList.remove('dark');
+                if (icon) icon.className = 'fa-solid fa-moon text-slate-300';
+            }
+            localStorage.setItem('timelog_theme', theme);
+
+            if (activeView === 'stats') {
+                renderStatsDashboard();
+            }
+        }
+
+        // Easter & Hessen Holiday Calculations
+        function getEasterSunday(year) {
+            const a = year % 19;
+            const b = Math.floor(year / 100);
+            const c = year % 100;
+            const d = Math.floor(b / 4);
+            const e = b % 4;
+            const f = Math.floor((b + 8) / 25);
+            const g = Math.floor((b - f + 1) / 3);
+            const h = (19 * a + b - d - g + 15) % 30;
+            const i = Math.floor(c / 4);
+            const k = c % 4;
+            const l = (32 + 2 * e + 2 * i - h - k) % 7;
+            const m = Math.floor((a + 11 * h + 22 * l) / 451);
+            const month = Math.floor((h + l - 7 * m + 114) / 31);
+            const day = ((h + l - 7 * m + 114) % 31) + 1;
+            return new Date(year, month - 1, day);
+        }
+
+        function getHessenHolidays(year) {
+            const easter = getEasterSunday(year);
+            const addDays = (baseDate, days) => {
+                const res = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate());
+                res.setDate(res.getDate() + days);
+                return res;
+            };
+
+            const holidays = {};
+            const formatIso = (d) => {
+                const m = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${year}-${m}-${day}`;
+            };
+
+            holidays[`${year}-01-01`] = 'Neujahr';
+            holidays[formatIso(addDays(easter, -2))] = 'Karfreitag';
+            holidays[formatIso(addDays(easter, 1))] = 'Ostermontag';
+            holidays[`${year}-05-01`] = 'Tag der Arbeit';
+            holidays[formatIso(addDays(easter, 39))] = 'Christi Himmelfahrt';
+            holidays[formatIso(addDays(easter, 50))] = 'Pfingstmontag';
+            holidays[formatIso(addDays(easter, 60))] = 'Fronleichnam';
+            holidays[`${year}-10-03`] = 'Tag der Deutschen Einheit';
+            holidays[`${year}-12-25`] = '1. Weihnachtstag';
+            holidays[`${year}-12-26`] = '2. Weihnachtstag';
+
+            return holidays;
+        }
+
+        function getISOWeek(date) {
+            const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+            const dayNum = d.getUTCDay() || 7;
+            d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+            const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+            return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+        }
+
+        function formatDateISO(year, month, day) {
+            const m = String(month + 1).padStart(2, '0');
+            const d = String(day).padStart(2, '0');
+            return `${year}-${m}-${d}`;
+        }
+
+        function getDaysInMonth(year, month) {
+            return new Date(year, month + 1, 0).getDate();
+        }
+
+        function isDayLogged(entry) {
+            if (!entry) return false;
+            if (entry.status === 'Wochenende' && !entry.start && (entry.istHours || 0) === 0) return false;
+            if (entry.status === 'Offen') return false;
+            
+            const activeStatuses = ['Büro', 'Homeoffice', 'Dienstreise', 'Urlaub', 'Krankheit', 'Zeitausgleich', 'Feiertag'];
+            if (activeStatuses.includes(entry.status)) return true;
+            if ((entry.istHours || 0) > 0 || (entry.start && entry.end)) return true;
+            
+            return false;
+        }
+
+        // DATABASE PERSISTENCE LOGIC
+        function loadFullDatabase() {
+            const saved = localStorage.getItem('timelog_full_db');
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    if (parsed && parsed.years) {
+                        timelogDB = parsed;
+                        return;
+                    }
+                } catch(e) {
+                    console.error("Database load error, re-initializing", e);
+                }
+            }
+            saveFullDatabase();
+        }
+
+        async function calculateChecksum(dataObj) {
+            const str = JSON.stringify(dataObj);
+            const msgUint8 = new TextEncoder().encode(str);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        async function saveFullDatabase() {
+            timelogDB.lastModified = new Date().toISOString();
+            timelogDB.checksum = await calculateChecksum(timelogDB.years);
+            localStorage.setItem('timelog_full_db', JSON.stringify(timelogDB));
+        }
+
+        function getYearData(yr) {
+            const yrStr = yr.toString();
+            if (!timelogDB.years[yrStr]) {
+                timelogDB.years[yrStr] = generateCleanSeedDataForYear(yr);
+                if (!timelogDB.vacationEntitlement[yrStr]) {
+                    timelogDB.vacationEntitlement[yrStr] = 30;
+                }
+                saveFullDatabase();
+            }
+            return timelogDB.years[yrStr];
+        }
+
+        function generateCleanSeedDataForYear(yr) {
+            const yearData = {};
+            const hessenHolidays = getHessenHolidays(yr);
+            
+            for (let m = 0; m < 12; m++) {
+                const totalDays = getDaysInMonth(yr, m);
+                for (let d = 1; d <= totalDays; d++) {
+                    const iso = formatDateISO(yr, m, d);
+                    const dt = new Date(yr, m, d);
+                    const dayOfWeek = dt.getDay();
+                    const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+                    const holidayName = hessenHolidays[iso];
+
+                    if (holidayName) {
+                        yearData[iso] = {
+                            status: 'Feiertag', start: '', end: '', breakMin: 0, sollHours: 0.0, istHours: 0.0, note: holidayName + (isWeekend ? ' (Wochenende)' : '')
+                        };
+                    } else if (isWeekend) {
+                        yearData[iso] = {
+                            status: 'Wochenende', start: '', end: '', breakMin: 0, sollHours: 0.0, istHours: 0.0, note: ''
+                        };
+                    } else {
+                        yearData[iso] = {
+                            status: 'Offen', start: '', end: '', breakMin: 0, sollHours: 8.0, istHours: 0.0, note: ''
+                        };
+                    }
+                }
+            }
+            return yearData;
+        }
+
+        function changeYear(newYear) {
+            currentYear = newYear;
+            document.getElementById('yearSelect').value = newYear;
+            
+            const dateInput = document.getElementById('modalDateInput');
+            dateInput.min = `${currentYear}-01-01`;
+            dateInput.max = `${currentYear}-12-31`;
+
+            const startVac = document.getElementById('vacationStartInput');
+            const endVac = document.getElementById('vacationEndInput');
+            startVac.min = `${currentYear}-01-01`;
+            startVac.max = `${currentYear}-12-31`;
+            endVac.min = `${currentYear}-01-01`;
+            endVac.max = `${currentYear}-12-31`;
+
+            getYearData(currentYear);
+            document.getElementById('vacationEntitlementInput').value = timelogDB.vacationEntitlement[currentYear.toString()] || 30;
+
+            renderMonthTabs();
+            renderCurrentView();
+        }
+
+        function updateVacationEntitlement(val) {
+            const num = parseInt(val) || 0;
+            timelogDB.vacationEntitlement[currentYear.toString()] = num;
+            saveFullDatabase();
+            renderCurrentView();
+            showToast(`Urlaubsanspruch für ${currentYear} auf ${num} Tage aktualisiert`, 'info');
+        }
+
+        function calculateIstHours(startStr, endStr, breakMins) {
+            if (!startStr || !endStr) return 0.0;
+            const [h1, m1] = startStr.split(':').map(Number);
+            const [h2, m2] = endStr.split(':').map(Number);
+            const startMins = h1 * 60 + m1;
+            const endMins = h2 * 60 + m2;
+            let diffMins = endMins - startMins - (parseInt(breakMins) || 0);
+            if (diffMins < 0) diffMins = 0;
+            return Math.round((diffMins / 60) * 100) / 100;
+        }
+
+        // UNIFIED FILE OPENER & PARSER (Desktop & Mobile kompatibel)
+        function openFilePicker() {
+            document.getElementById('unifiedFileInput').click();
+        }
+
+        function handleFileSelected(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const content = e.target.result;
+                try {
+                    if (file.name.endsWith('.json')) {
+                        await processJSONImport(content);
+                    } else if (file.name.endsWith('.csv')) {
+                        processCSVImport(content);
+                    }
+                } catch(err) {
+                    console.error("Import error:", err);
+                    showToast("Fehler beim Lesen der Datei! Format ungültig.", "info");
+                }
+                event.target.value = '';
+            };
+            reader.readAsText(file);
+        }
+
+        async function processJSONImport(jsonText) {
+            const parsed = JSON.parse(jsonText);
+
+            // 1. FORMAT: Desktop Vollbank / Multi-Jahr
+            if (parsed.years && typeof parsed.years === 'object') {
+                timelogDB = parsed;
+                if (parsed.checksum) {
+                    const currentCalc = await calculateChecksum(parsed.years);
+                    if (currentCalc !== parsed.checksum) {
+                        showToast("⚠ Prüfsummen-Abweichung: Datei könnte modifiziert worden sein.", "info");
+                    }
+                }
+                const totalYearsLoaded = Object.keys(timelogDB.years).length;
+                saveFullDatabase();
+                changeYear(currentYear);
+                showToast(`Erfolgreich! Desktop-Datenbank mit ${totalYearsLoaded} Jahren geladen.`, "success");
+            } 
+            // 2. FORMAT: Desktop Einzeljahr
+            else if (parsed.data && typeof parsed.data === 'object') {
+                const yr = (parsed.year || currentYear).toString();
+                timelogDB.years[yr] = parsed.data;
+                if (parsed.vacationEntitlement) {
+                    timelogDB.vacationEntitlement[yr] = parsed.vacationEntitlement;
+                }
+                saveFullDatabase();
+                changeYear(parseInt(yr));
+                showToast(`Jahr ${yr} erfolgreich geladen!`, "success");
+            } 
+            // 3. FORMAT: Mobile Export (TimeLog Mobile v1.2.x)
+            else if (parsed.entries || Array.isArray(parsed)) {
+                const rawEntries = parsed.entries || parsed;
+                if (!Array.isArray(rawEntries)) {
+                    showToast("Ungültige mobile Backup-Datei.", "info");
+                    return;
+                }
+
+                if (parsed.settings && parsed.settings.targetVacationDays) {
+                    const yrStr = currentYear.toString();
+                    timelogDB.vacationEntitlement[yrStr] = Number(parsed.settings.targetVacationDays) || 30;
+                    document.getElementById('vacationEntitlementInput').value = timelogDB.vacationEntitlement[yrStr];
+                }
+
+                let importedCount = 0;
+                let detectedYear = currentYear;
+
+                rawEntries.forEach(item => {
+                    if (!item || !item.date) return;
+                    const dateStr = item.date.trim();
+                    const [yStr, mStr, dStr] = dateStr.split('-');
+                    if (!yStr || !mStr || !dStr) return;
+
+                    const yr = parseInt(yStr);
+                    detectedYear = yr;
+                    const yearData = getYearData(yr);
+
+                    const mobileType = item.type || 'arbeit';
+                    let status = 'Büro';
+                    let start = item.start || '';
+                    let end = item.end || '';
+                    let breakMin = parseInt(item.pause) || 0;
+                    let note = item.note || '';
+
+                    const dt = new Date(yr, parseInt(mStr) - 1, parseInt(dStr));
+                    const dayOfWeek = dt.getDay();
+                    const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+                    const hessenHolidays = getHessenHolidays(yr);
+                    const isHoliday = !!hessenHolidays[dateStr];
+
+                    let sollHours = (isWeekend || isHoliday) ? 0.0 : 8.0;
+                    let istHours = 0.0;
+
+                    if (mobileType === 'arbeit') {
+                        if (note.toLowerCase().includes('homeoffice') || note.toLowerCase().includes('ho')) {
+                            status = 'Homeoffice';
+                        } else {
+                            status = 'Büro';
+                        }
+                        if (start && end) {
+                            istHours = calculateIstHours(start, end, breakMin);
+                        } else if (item.minutes) {
+                            istHours = Math.round((item.minutes / 60) * 100) / 100;
+                        }
+                    } else if (mobileType === 'urlaub') {
+                        status = 'Urlaub';
+                        sollHours = 8.0;
+                        istHours = 8.0;
+                    } else if (mobileType === 'krank') {
+                        status = 'Krankheit';
+                        sollHours = 8.0;
+                        istHours = 8.0;
+                    } else if (mobileType === 'feiertag') {
+                        status = 'Feiertag';
+                        sollHours = 0.0;
+                        istHours = 0.0;
+                        if (!note && hessenHolidays[dateStr]) {
+                            note = hessenHolidays[dateStr];
+                        }
+                    } else if (mobileType === 'gleittag') {
+                        status = 'Zeitausgleich';
+                        sollHours = 8.0;
+                        istHours = 0.0;
+                    }
+
+                    yearData[dateStr] = {
+                        status: status,
+                        start: start,
+                        end: end,
+                        breakMin: breakMin,
+                        sollHours: sollHours,
+                        istHours: istHours,
+                        note: note
+                    };
+                    importedCount++;
+                });
+
+                if (importedCount > 0) {
+                    saveFullDatabase();
+                    changeYear(detectedYear);
+                    showToast(`Erfolg: ${importedCount} Einträge aus mobilem Backup importiert!`, "success");
+                } else {
+                    showToast("Keine gültigen mobilen Einträge gefunden.", "info");
+                }
+            } else {
+                showToast("Ungültige JSON-Struktur.", "info");
+            }
+        }
+
+        // Robust CSV Parser
+        function parseCSVText(text) {
+            let p = '', c = '', r = [];
+            let q = false;
+            let row = [''];
+
+            for (let i = 0; i < text.length; i++) {
+                c = text[i];
+                p = text[i - 1];
+
+                if (c === '"') {
+                    if (q && text[i + 1] === '"') {
+                        row[row.length - 1] += '"';
+                        i++;
+                    } else {
+                        q = !q;
+                    }
+                } else if ((c === ';' || c === ',') && !q) {
+                    row.push('');
+                } else if ((c === '\r' || c === '\n') && !q) {
+                    if (c === '\r' && text[i + 1] === '\n') i++;
+                    r.push(row);
+                    row = [''];
+                } else {
+                    row[row.length - 1] += c;
+                }
+            }
+            if (row.length > 1 || row[0] !== '') r.push(row);
+            return r;
+        }
+
+        function processCSVImport(csvText) {
+            const rows = parseCSVText(csvText);
+            if (rows.length < 2) return;
+
+            const headers = rows[0].map(h => h.trim().toLowerCase());
+            let isoIdx = headers.findIndex(h => h.includes('datum') || h.includes('iso'));
+            let statusIdx = headers.findIndex(h => h.includes('status') || h.includes('typ'));
+            let startIdx = headers.findIndex(h => h.includes('start') || h.includes('beginn'));
+            let endIdx = headers.findIndex(h => h.includes('ende'));
+            let breakIdx = headers.findIndex(h => h.includes('pause'));
+            let istIdx = headers.findIndex(h => h.includes('ist') || h.includes('dauer'));
+            let sollIdx = headers.findIndex(h => h.includes('soll'));
+            let noteIdx = headers.findIndex(h => h.includes('notiz') || h.includes('aufgabe') || h.includes('projekt'));
+
+            if (isoIdx === -1) isoIdx = 1;
+            if (statusIdx === -1) statusIdx = 3;
+            if (startIdx === -1) startIdx = 4;
+            if (endIdx === -1) endIdx = 5;
+            if (breakIdx === -1) breakIdx = 6;
+            if (istIdx === -1) istIdx = 7;
+            if (sollIdx === -1) sollIdx = 8;
+            if (noteIdx === -1) noteIdx = 10;
+
+            let importedCount = 0;
+
+            for (let i = 1; i < rows.length; i++) {
+                const row = rows[i];
+                if (!row || row.length <= 1) continue;
+
+                const iso = (row[isoIdx] || '').trim();
+                if (!iso.match(/^\d{4}-\d{2}-\d{2}$/)) continue;
+
+                const yearStr = iso.split('-')[0];
+                const yearData = getYearData(parseInt(yearStr));
+
+                let status = (row[statusIdx] || 'Offen').trim();
+                if (status === 'arbeit') status = 'Büro';
+                if (status === 'urlaub') status = 'Urlaub';
+                if (status === 'krank') status = 'Krankheit';
+                if (status === 'feiertag') status = 'Feiertag';
+                if (status === 'gleittag') status = 'Zeitausgleich';
+
+                const start = (row[startIdx] || '').trim();
+                const end = (row[endIdx] || '').trim();
+                const breakMin = parseInt(row[breakIdx]) || 0;
+                const rawIst = (row[istIdx] || '0').replace(',', '.');
+                const rawSoll = (row[sollIdx] || '8').replace(',', '.');
+                
+                let sollHours = parseFloat(rawSoll) || 0;
+                let istHours = parseFloat(rawIst) || 0;
+
+                if (start && end) {
+                    istHours = calculateIstHours(start, end, breakMin);
+                } else if (status === 'Urlaub' || status === 'Krankheit') {
+                    istHours = sollHours;
+                }
+
+                const note = (row[noteIdx] || '').trim();
+
+                yearData[iso] = { status, start, end, breakMin, sollHours, istHours, note };
+                importedCount++;
+            }
+
+            saveFullDatabase();
+            changeYear(currentYear);
+            showToast(`${importedCount} Einträge aus CSV in die Datenbank importiert!`, "success");
+        }
+
+        // SAVE & EXPORT FUNCTIONS WITH TIMESTAMPS
+        async function saveDatabaseJSON() {
+            await saveFullDatabase();
+            
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+
+            const dateStr = `${year}-${month}-${day}`;
+            const timeStr = `${hours}-${minutes}-${seconds}`;
+            const filename = `TimeLog_database_${dateStr}_${timeStr}.json`;
+
+            const jsonStr = JSON.stringify(timelogDB, null, 2);
+            const blob = new Blob([jsonStr], { type: 'application/json' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = filename;
+            link.click();
+            showToast(`Datenbank als ${filename} gespeichert!`, "success");
+        }
+
+        function exportCSV() {
+            const yearData = getYearData(currentYear);
+            let csv = 'KW;Datum;Wochentag;Status;Start;Ende;Pause (Min);Ist-Zeit (h);Soll-Zeit (h);Differenz (h);Notiz\n';
+
+            Object.keys(yearData).sort().forEach(iso => {
+                const entry = yearData[iso];
+                const [y, m, d] = iso.split('-').map(Number);
+                const dt = new Date(y, m - 1, d);
+                const kw = getISOWeek(dt);
+                const isLogged = isDayLogged(entry);
+                const diff = (entry.istHours || 0) - (entry.sollHours || 0);
+
+                const cleanNote = (entry.note || '').replace(/"/g, '""');
+                csv += `KW ${kw};${iso};${dayNamesDE[dt.getDay()]};${entry.status};${entry.start || ''};${entry.end || ''};${entry.breakMin || 0};${isLogged ? (entry.istHours || 0).toFixed(2).replace('.', ',') : ''};${isLogged ? (entry.sollHours || 0).toFixed(2).replace('.', ',') : ''};${isLogged ? diff.toFixed(2).replace('.', ',') : ''};"${cleanNote}"\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `TimeLog_Arbeitszeiten_${currentYear}.csv`;
+            link.click();
+            showToast(`CSV-Export für ${currentYear} heruntergeladen`, "success");
+        }
+
+        function renderMonthTabs() {
+            const container = document.getElementById('monthTabsContainer');
+            container.innerHTML = '';
+
+            monthNames.forEach((name, idx) => {
+                const btn = document.createElement('button');
+                btn.onclick = () => selectMonth(idx);
+                if (idx === currentMonth) {
+                    btn.className = "px-3 py-1 rounded-lg text-xs font-bold whitespace-nowrap bg-indigo-600 text-white shadow";
+                } else {
+                    btn.className = "px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition";
+                }
+                btn.innerText = name;
+                container.appendChild(btn);
+            });
+        }
+
+        function selectMonth(idx) {
+            currentMonth = idx;
+            renderMonthTabs();
+            renderCurrentView();
+        }
+
+        function switchView(view) {
+            activeView = view;
+            
+            document.getElementById('navMonthBtn').className = view === 'month' ? "px-3 py-1.5 rounded-lg transition bg-indigo-600 text-white shadow" : "px-3 py-1.5 rounded-lg transition text-slate-300 hover:text-white hover:bg-slate-700";
+            document.getElementById('navYearBtn').className = view === 'year' ? "px-3 py-1.5 rounded-lg transition bg-indigo-600 text-white shadow" : "px-3 py-1.5 rounded-lg transition text-slate-300 hover:text-white hover:bg-slate-700";
+            document.getElementById('navStatsBtn').className = view === 'stats' ? "px-3 py-1.5 rounded-lg transition bg-indigo-600 text-white shadow" : "px-3 py-1.5 rounded-lg transition text-slate-300 hover:text-white hover:bg-slate-700";
+
+            const monthTabsSection = document.getElementById('monthTabsSection');
+            const monthSummaryBar = document.getElementById('monthSummaryBar');
+            if (view === 'month') {
+                monthTabsSection.classList.remove('hidden');
+                monthSummaryBar.classList.remove('hidden');
+            } else {
+                monthTabsSection.classList.add('hidden');
+                monthSummaryBar.classList.add('hidden');
+            }
+
+            document.getElementById('monthViewContainer').classList.toggle('hidden', view !== 'month');
+            document.getElementById('yearViewContainer').classList.toggle('hidden', view !== 'year');
+            document.getElementById('statsViewContainer').classList.toggle('hidden', view !== 'stats');
+
+            renderCurrentView();
+        }
+
+        function renderCurrentView() {
+            updateMonthSummaryBar();
+
+            if (activeView === 'month') {
+                renderMonthTable();
+            } else if (activeView === 'year') {
+                renderYearGrid();
+            } else if (activeView === 'stats') {
+                renderStatsDashboard();
+            }
+        }
+
+        function updateMonthSummaryBar() {
+            document.getElementById('activeMonthTitle').innerText = `${monthNames[currentMonth]} ${currentYear}`;
+
+            const totalDays = getDaysInMonth(currentYear, currentMonth);
+            const yearData = getYearData(currentYear);
+
+            let monthSollLogged = 0;
+            let monthIstLogged = 0;
+            let loggedDaysCount = 0;
+            let hoDaysCount = 0;
+            let urlaubDaysCount = 0;
+
+            for (let d = 1; d <= totalDays; d++) {
+                const iso = formatDateISO(currentYear, currentMonth, d);
+                const entry = yearData[iso] || {};
+                
+                if (isDayLogged(entry)) {
+                    loggedDaysCount++;
+                    monthSollLogged += (entry.sollHours || 0);
+                    monthIstLogged += (entry.istHours || 0);
+                }
+
+                if (entry.status === 'Homeoffice') hoDaysCount++;
+                if (entry.status === 'Urlaub') urlaubDaysCount++;
+            }
+
+            const diff = monthIstLogged - monthSollLogged;
+            
+            document.getElementById('monthWorkdaysCount').innerText = `${loggedDaysCount} erfasste Tage`;
+            document.getElementById('metricMonthSoll').innerText = `${monthSollLogged.toFixed(1)} h`;
+            document.getElementById('metricMonthIst').innerText = `${monthIstLogged.toFixed(1)} h`;
+
+            const diffElem = document.getElementById('metricMonthDiff');
+            diffElem.innerText = `${diff >= 0 ? '+' : ''}${diff.toFixed(1)} h`;
+            if (diff > 0) {
+                diffElem.className = "font-bold ml-1 px-2 py-0.5 rounded text-white bg-emerald-600";
+            } else if (diff < 0) {
+                diffElem.className = "font-bold ml-1 px-2 py-0.5 rounded text-white bg-rose-600";
+            } else {
+                diffElem.className = "font-bold ml-1 px-2 py-0.5 rounded text-slate-300 bg-slate-700";
+            }
+
+            document.getElementById('metricMonthHO').innerText = `${hoDaysCount} Tage`;
+            document.getElementById('metricMonthUrlaub').innerText = `${urlaubDaysCount} Tage`;
+        }
+
+        function renderMonthTable() {
+            const tbody = document.getElementById('monthTableBody');
+            tbody.innerHTML = '';
+
+            const totalDays = getDaysInMonth(currentYear, currentMonth);
+            const yearData = getYearData(currentYear);
+
+            for (let d = 1; d <= totalDays; d++) {
+                const iso = formatDateISO(currentYear, currentMonth, d);
+                const dt = new Date(currentYear, currentMonth, d);
+                const dayOfWeekNum = dt.getDay();
+                const isWeekend = (dayOfWeekNum === 0 || dayOfWeekNum === 6);
+                const kw = getISOWeek(dt);
+
+                const entry = yearData[iso] || {
+                    status: isWeekend ? 'Wochenende' : 'Offen',
+                    start: '', end: '', breakMin: 0, sollHours: isWeekend ? 0 : 8.0, istHours: 0, note: ''
+                };
+
+                const isLogged = isDayLogged(entry);
+                const diff = (entry.istHours || 0) - (entry.sollHours || 0);
+
+                const tr = document.createElement('tr');
+                tr.onclick = () => openModalWithDate(iso);
+                
+                if (entry.status === 'Feiertag') {
+                    tr.className = "bg-rose-100/80 dark:bg-rose-950/40 text-rose-950 dark:text-rose-200 border-b border-rose-200 dark:border-rose-900/50 hover:bg-rose-200/80 cursor-pointer transition font-medium";
+                } else if (isWeekend) {
+                    tr.className = "bg-slate-200/80 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 border-b border-slate-300 dark:border-slate-700 hover:bg-indigo-100/60 dark:hover:bg-indigo-950/40 cursor-pointer transition";
+                } else {
+                    tr.className = "bg-white dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700 hover:bg-indigo-50/70 dark:hover:bg-slate-700/60 cursor-pointer transition";
+                }
+
+                let statusBadge = '';
+                switch(entry.status) {
+                    case 'Büro':
+                        statusBadge = '<span class="px-2 py-0.5 rounded text-[11px] font-semibold bg-indigo-100 dark:bg-indigo-950 text-indigo-800 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">🏢 Büro</span>';
+                        break;
+                    case 'Homeoffice':
+                        statusBadge = '<span class="px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800">🏠 Homeoffice</span>';
+                        break;
+                    case 'Dienstreise':
+                        statusBadge = '<span class="px-2 py-0.5 rounded text-[11px] font-semibold bg-purple-100 dark:bg-purple-950 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-800">🚗 Dienstreise</span>';
+                        break;
+                    case 'Urlaub':
+                        statusBadge = '<span class="px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">🏖️ Urlaub</span>';
+                        break;
+                    case 'Krankheit':
+                        statusBadge = '<span class="px-2 py-0.5 rounded text-[11px] font-semibold bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-800">🤒 Krankheit</span>';
+                        break;
+                    case 'Feiertag':
+                        statusBadge = '<span class="px-2 py-0.5 rounded text-[11px] font-semibold bg-red-100 dark:bg-red-950 text-red-800 dark:text-red-300 border border-red-300 dark:border-red-800">🎉 Feiertag (HE)</span>';
+                        break;
+                    case 'Zeitausgleich':
+                        statusBadge = '<span class="px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800">⚖️ Zeitausgleich</span>';
+                        break;
+                    case 'Wochenende':
+                        statusBadge = '<span class="px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-300 dark:bg-slate-700 text-slate-700 dark:text-slate-300">🛋 Wochenende</span>';
+                        break;
+                    default:
+                        statusBadge = '<span class="px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 dark:bg-slate-700/50 text-slate-400 dark:text-slate-400 border border-slate-200 dark:border-slate-600">Offen</span>';
+                }
+
+                let diffHtml = '<span class="text-slate-300 dark:text-slate-600">-</span>';
+                if (isLogged) {
+                    if (diff > 0) {
+                        diffHtml = `<span class="font-bold text-emerald-600 dark:text-emerald-400">+${diff.toFixed(1)} h</span>`;
+                    } else if (diff < 0) {
+                        diffHtml = `<span class="font-bold text-rose-600 dark:text-rose-400">${diff.toFixed(1)} h</span>`;
+                    } else {
+                        diffHtml = `<span class="font-bold text-slate-400 dark:text-slate-500">0,0 h</span>`;
+                    }
+                }
+
+                const dateFormatted = `${String(d).padStart(2, '0')}.${String(currentMonth + 1).padStart(2, '0')}.${currentYear}`;
+
+                tr.innerHTML = `
+                    <td class="p-2.5 text-center font-bold text-amber-900 dark:text-amber-200 bg-amber-100/80 dark:bg-amber-950/80 border-r border-amber-300 dark:border-amber-800 shadow-xs">KW ${kw}</td>
+                    <td class="p-2.5 font-medium border-r border-slate-200 dark:border-slate-700">${dateFormatted}</td>
+                    <td class="p-2.5 font-semibold border-r border-slate-200 dark:border-slate-700">${dayNamesDE[dayOfWeekNum]}</td>
+                    <td class="p-2.5 border-r border-slate-200 dark:border-slate-700">${statusBadge}</td>
+                    <td class="p-2.5 text-center border-r border-slate-200 dark:border-slate-700 font-mono text-slate-700 dark:text-slate-300">${entry.start || '-'}</td>
+                    <td class="p-2.5 text-center border-r border-slate-200 dark:border-slate-700 font-mono text-slate-700 dark:text-slate-300">${entry.end || '-'}</td>
+                    <td class="p-2.5 text-center border-r border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400">${entry.breakMin ? entry.breakMin + ' min' : '-'}</td>
+                    <td class="p-2.5 text-right font-bold text-slate-900 dark:text-white border-r border-slate-200 dark:border-slate-700">${isLogged ? (entry.istHours || 0).toFixed(1) + ' h' : '-'}</td>
+                    <td class="p-2.5 text-right text-slate-600 dark:text-slate-400 border-r border-slate-200 dark:border-slate-700">${isLogged ? (entry.sollHours || 0).toFixed(1) + ' h' : '-'}</td>
+                    <td class="p-2.5 text-right border-r border-slate-200 dark:border-slate-700">${diffHtml}</td>
+                    <td class="p-2.5 border-r border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 truncate max-w-[200px]" title="${entry.note || ''}">${entry.note || ''}</td>
+                    <td class="p-2.5 text-center flex items-center justify-center space-x-1">
+                        <button onclick="event.stopPropagation(); openCopyModalDirect('${iso}')" title="Diesen Tag kopieren" class="p-1 px-2 bg-indigo-50 dark:bg-indigo-950 hover:bg-indigo-600 hover:text-white text-indigo-700 dark:text-indigo-300 rounded-lg text-xs font-semibold transition border border-indigo-200 dark:border-indigo-800 shadow-xs">
+                            <i class="fa-solid fa-copy"></i>
+                        </button>
+                        <button onclick="event.stopPropagation(); openModalWithDate('${iso}')" title="Bearbeiten" class="p-1 px-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-700 hover:text-white text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold transition border border-slate-300 dark:border-slate-600 shadow-xs">
+                            <i class="fa-solid fa-pen-to-square"></i>
+                        </button>
+                    </td>
+                `;
+
+                tbody.appendChild(tr);
+            }
+        }
+
+        function renderYearGrid() {
+            const container = document.getElementById('yearGridContainer');
+            container.innerHTML = '';
+            const yearData = getYearData(currentYear);
+
+            for (let m = 0; m < 12; m++) {
+                const monthCard = document.createElement('div');
+                monthCard.className = "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-3.5 shadow-sm hover:shadow-md transition cursor-pointer";
+                monthCard.onclick = () => { selectMonth(m); switchView('month'); };
+
+                let html = `<div class="font-bold text-sm text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-700 pb-2 mb-2 flex justify-between items-center">
+                    <span class="text-indigo-900 dark:text-indigo-300 font-extrabold">${monthNames[m]} ${currentYear}</span>
+                    <span class="text-[10px] bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded-full font-semibold border border-slate-200 dark:border-slate-600">
+                        ${getDaysInMonth(currentYear, m)} Tage
+                    </span>
+                </div>`;
+
+                html += `<div class="grid grid-cols-8 gap-0.5 text-center text-[9px] font-bold text-slate-400 mb-1">
+                    <div class="text-amber-800 dark:text-amber-300 bg-amber-100/90 dark:bg-amber-950/80 rounded py-0.5 font-extrabold">KW</div>
+                    <div class="py-0.5">M</div><div class="py-0.5">D</div><div class="py-0.5">M</div><div class="py-0.5">D</div><div class="py-0.5">F</div>
+                    <div class="py-0.5 text-slate-600 dark:text-slate-300 bg-slate-200 dark:bg-slate-700 rounded font-bold">S</div>
+                    <div class="py-0.5 text-slate-600 dark:text-slate-300 bg-slate-200 dark:bg-slate-700 rounded font-bold">S</div>
+                </div>`;
+
+                html += `<div class="grid grid-cols-8 gap-0.5 text-center text-[10px]">`;
+
+                const totalDays = getDaysInMonth(currentYear, m);
+                const firstDayIdx = new Date(currentYear, m, 1).getDay();
+                const adjustedFirstDay = (firstDayIdx + 6) % 7;
+
+                let dayCounter = 1;
+                const totalCells = adjustedFirstDay + totalDays;
+                const totalRows = Math.ceil(totalCells / 7);
+
+                for (let r = 0; r < totalRows; r++) {
+                    let sampleDay = dayCounter <= totalDays ? dayCounter : totalDays;
+                    const sampleDate = new Date(currentYear, m, sampleDay);
+                    const kwNum = getISOWeek(sampleDate);
+
+                    html += `<div class="bg-amber-100/90 dark:bg-amber-950/80 text-amber-900 dark:text-amber-200 font-bold rounded flex items-center justify-center text-[8px]">
+                        ${kwNum}
+                    </div>`;
+
+                    for (let c = 0; c < 7; c++) {
+                        const isWeekend = (c === 5 || c === 6);
+
+                        if ((r === 0 && c < adjustedFirstDay) || dayCounter > totalDays) {
+                            html += `<div class="p-1"></div>`;
+                        } else {
+                            const iso = formatDateISO(currentYear, m, dayCounter);
+                            const entry = yearData[iso] || {};
+                            
+                            let bgStyle = isWeekend ? 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400 font-medium' : 'bg-slate-50 dark:bg-slate-900/50 text-slate-700 dark:text-slate-300';
+                            
+                            if (entry.status === 'Urlaub') bgStyle = 'bg-emerald-500 text-white font-bold rounded-sm';
+                            else if (entry.status === 'Homeoffice') bgStyle = 'bg-blue-500 text-white font-bold rounded-sm';
+                            else if (entry.status === 'Büro') bgStyle = 'bg-indigo-600 text-white font-bold rounded-sm';
+                            else if (entry.status === 'Dienstreise') bgStyle = 'bg-purple-600 text-white font-bold rounded-sm';
+                            else if (entry.status === 'Krankheit') bgStyle = 'bg-rose-500 text-white font-bold rounded-sm';
+                            else if (entry.status === 'Feiertag') bgStyle = 'bg-red-500 text-white font-bold rounded-sm';
+                            else if (entry.status === 'Zeitausgleich') bgStyle = 'bg-amber-500 text-white font-bold rounded-sm';
+                            else if (entry.istHours > 0) bgStyle = 'bg-indigo-500 text-white font-bold rounded-sm';
+
+                            html += `<div onclick="event.stopPropagation(); openModalWithDate('${iso}')" 
+                                          class="p-0.5 rounded text-[9px] hover:ring-2 hover:ring-indigo-400 cursor-pointer transition ${bgStyle}" 
+                                          title="${dayCounter}. ${monthNames[m]}: ${entry.status || 'Offen'} ${entry.note ? '(' + entry.note + ')' : ''}">
+                                        ${dayCounter}
+                                     </div>`;
+                            dayCounter++;
+                        }
+                    }
+                }
+
+                html += `</div>`;
+                monthCard.innerHTML = html;
+                container.appendChild(monthCard);
+            }
+        }
+
+        function renderStatsDashboard() {
+            document.getElementById('statYearLabel1').innerText = currentYear;
+            document.getElementById('statYearLabel2').innerText = currentYear;
+
+            let totalSollLoggedYear = 0;
+            let totalIstLoggedYear = 0;
+            let vacationDaysCount = 0;
+            let homeofficeDaysCount = 0;
+            let bueroDaysCount = 0;
+            let dienstreiseDaysCount = 0;
+
+            const monthlyIstArray = new Array(12).fill(0);
+            const monthlySollArray = new Array(12).fill(0);
+            
+            const statusCounts = {
+                'Büro': 0, 'Homeoffice': 0, 'Dienstreise': 0, 'Urlaub': 0, 'Krankheit': 0, 'Zeitausgleich': 0
+            };
+
+            const yearData = getYearData(currentYear);
+            let maxLoggedIso = null;
+
+            for (let m = 0; m < 12; m++) {
+                const daysM = getDaysInMonth(currentYear, m);
+                for (let d = 1; d <= daysM; d++) {
+                    const iso = formatDateISO(currentYear, m, d);
+                    const entry = yearData[iso] || {};
+                    
+                    if (isDayLogged(entry)) {
+                        const ist = entry.istHours || 0;
+                        const soll = entry.sollHours || 0;
+
+                        totalIstLoggedYear += ist;
+                        totalSollLoggedYear += soll;
+
+                        monthlyIstArray[m] += ist;
+                        monthlySollArray[m] += soll;
+
+                        if (statusCounts[entry.status] !== undefined) {
+                            statusCounts[entry.status]++;
+                        }
+                        maxLoggedIso = iso;
+                    }
+
+                    if (entry.status === 'Urlaub') vacationDaysCount++;
+                    if (entry.status === 'Homeoffice') homeofficeDaysCount++;
+                    if (entry.status === 'Büro') bueroDaysCount++;
+                    if (entry.status === 'Dienstreise') dienstreiseDaysCount++;
+                }
+            }
+
+            const netOvertimeTotal = totalIstLoggedYear - totalSollLoggedYear;
+
+            const overElem = document.getElementById('statOvertimeTotal');
+            overElem.innerText = `${netOvertimeTotal >= 0 ? '+' : ''}${netOvertimeTotal.toFixed(1)} h`;
+            overElem.className = netOvertimeTotal >= 0 ? "text-3xl font-black text-emerald-600 dark:text-emerald-400" : "text-3xl font-black text-rose-600 dark:text-rose-400";
+
+            document.getElementById('statIstTotal').innerText = `${totalIstLoggedYear.toFixed(1)} h`;
+            document.getElementById('statSollTotal').innerText = `${totalSollLoggedYear.toFixed(1)} h`;
+            
+            const vacationEntitlement = timelogDB.vacationEntitlement[currentYear.toString()] || 30;
+            const remainingVacation = vacationEntitlement - vacationDaysCount;
+            document.getElementById('statVacationUsed').innerText = `${vacationDaysCount} Tag${vacationDaysCount === 1 ? '' : 'e'}`;
+            const remElem = document.getElementById('statVacationRemaining');
+            remElem.innerText = remainingVacation;
+            remElem.className = remainingVacation < 0 ? "text-2xl font-extrabold text-rose-600 dark:text-rose-400" : "text-2xl font-extrabold text-emerald-600 dark:text-emerald-400";
+
+            const actualWorkdaysCount = bueroDaysCount + homeofficeDaysCount + dienstreiseDaysCount;
+            const hoRate = actualWorkdaysCount > 0 ? Math.round((homeofficeDaysCount / actualWorkdaysCount) * 100) : 0;
+            
+            document.getElementById('statHomeofficeRate').innerText = `${hoRate}%`;
+            document.getElementById('statHomeofficeTotal').innerText = `${homeofficeDaysCount} HO-Tage`;
+            document.getElementById('statActualWorkdaysTotal').innerText = `${actualWorkdaysCount} Arbeitstagen`;
+
+            const isDark = document.documentElement.classList.contains('dark');
+            const textColor = isDark ? '#f1f5f9' : '#334155';
+            const gridColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
+
+            // --- 1. ZEITKONTO TREND CHART ---
+            const trendLabels = [];
+            const trendData = [];
+            let cumulativeBalance = 0;
+
+            if (maxLoggedIso) {
+                const [maxY, maxM, maxD] = maxLoggedIso.split('-').map(Number);
+                let cur = new Date(currentYear, 0, 1);
+                const endDate = new Date(maxY, maxM - 1, maxD);
+
+                while (cur <= endDate) {
+                    const y = cur.getFullYear();
+                    const m = cur.getMonth();
+                    const d = cur.getDate();
+                    const iso = formatDateISO(y, m, d);
+                    const entry = yearData[iso] || {};
+
+                    if (isDayLogged(entry)) {
+                        const ist = entry.istHours || 0;
+                        const soll = entry.sollHours || 0;
+                        cumulativeBalance += (ist - soll);
+
+                        trendLabels.push(`${String(d).padStart(2, '0')}.${String(m + 1).padStart(2, '0')}.`);
+                        trendData.push(Math.round(cumulativeBalance * 100) / 100);
+                    }
+                    cur.setDate(cur.getDate() + 1);
+                }
+                
+                const [lY, lM, lD] = maxLoggedIso.split('-').map(Number);
+                document.getElementById('statZeitkontoLastLoggedLabel').innerText = `Erfasst bis ${lD}. ${monthNames[lM - 1]} ${lY}`;
+            } else {
+                document.getElementById('statZeitkontoLastLoggedLabel').innerText = `Keine Einträge für ${currentYear}`;
+            }
+
+            const ctxTrend = document.getElementById('chartZeitkontoTrend').getContext('2d');
+            if (chartZeitkontoInstance) chartZeitkontoInstance.destroy();
+
+            chartZeitkontoInstance = new Chart(ctxTrend, {
+                type: 'line',
+                data: {
+                    labels: trendLabels,
+                    datasets: [{
+                        label: 'Kumuliertes Stundenkonto (h)',
+                        data: trendData,
+                        borderColor: '#6366f1',
+                        backgroundColor: isDark ? 'rgba(99, 102, 241, 0.15)' : 'rgba(99, 102, 241, 0.08)',
+                        borderWidth: 2.5,
+                        pointRadius: trendData.length > 50 ? 1 : 3,
+                        pointHoverRadius: 6,
+                        fill: true,
+                        tension: 0.25
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (context) => `Stundenkonto: ${context.parsed.y >= 0 ? '+' : ''}${context.parsed.y.toFixed(1)} h`
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: textColor, maxTicksLimit: 16 },
+                            grid: { color: gridColor }
+                        },
+                        y: {
+                            beginAtZero: false,
+                            ticks: {
+                                color: textColor,
+                                callback: (value) => `${value >= 0 ? '+' : ''}${value} h`
+                            },
+                            grid: { color: gridColor }
+                        }
+                    }
+                }
+            });
+
+            // --- 2. BAR CHART (SOLL VS IST MONATLICH) ---
+            const ctx1 = document.getElementById('chartMonthlyHours').getContext('2d');
+            if (chartMonthlyInstance) chartMonthlyInstance.destroy();
+
+            chartMonthlyInstance = new Chart(ctx1, {
+                type: 'bar',
+                data: {
+                    labels: monthNames.map(m => m.substring(0, 3)),
+                    datasets: [
+                        { label: 'Ist-Stunden', data: monthlyIstArray, backgroundColor: '#4f46e5', borderRadius: 6 },
+                        { label: 'Soll-Stunden (erfasst)', data: monthlySollArray, backgroundColor: isDark ? '#475569' : '#cbd5e1', borderRadius: 6 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'top', labels: { color: textColor } } },
+                    scales: {
+                        x: { ticks: { color: textColor }, grid: { color: gridColor } },
+                        y: { beginAtZero: true, ticks: { color: textColor }, grid: { color: gridColor } }
+                    }
+                }
+            });
+
+            // --- 3. DOUGHNUT CHART ---
+            const ctx2 = document.getElementById('chartStatusBreakdown').getContext('2d');
+            if (chartStatusInstance) chartStatusInstance.destroy();
+
+            chartStatusInstance = new Chart(ctx2, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Büro', 'Homeoffice', 'Dienstreise', 'Urlaub', 'Krankheit', 'Zeitausgleich'],
+                    datasets: [{
+                        data: [
+                            statusCounts['Büro'], statusCounts['Homeoffice'], statusCounts['Dienstreise'],
+                            statusCounts['Urlaub'], statusCounts['Krankheit'], statusCounts['Zeitausgleich']
+                        ],
+                        backgroundColor: ['#4f46e5', '#3b82f6', '#9333ea', '#10b981', '#f43f5e', '#f59e0b']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom', labels: { color: textColor } } }
+                }
+            });
+        }
+
+        function openModalWithDate(isoDate = null) {
+            const modal = document.getElementById('entryModal');
+            const defaultIso = formatDateISO(currentYear, currentMonth, 1);
+            const targetIso = isoDate || defaultIso;
+
+            const dateInput = document.getElementById('modalDateInput');
+            dateInput.value = targetIso;
+
+            loadModalDataForDate(targetIso);
+            modal.classList.remove('hidden');
+        }
+
+        function handleModalDateChange() {
+            const newIso = document.getElementById('modalDateInput').value;
+            if (newIso) {
+                const [y] = newIso.split('-').map(Number);
+                if (y !== currentYear) changeYear(y);
+                loadModalDataForDate(newIso);
+            }
+        }
+
+        function loadModalDataForDate(isoDate) {
+            const [y, m, d] = isoDate.split('-').map(Number);
+            const dt = new Date(y, m - 1, d);
+            const kw = getISOWeek(dt);
+            const isWeekend = (dt.getDay() === 0 || dt.getDay() === 6);
+
+            document.getElementById('modalKWInfo').innerText = `Kalenderwoche ${kw}`;
+            document.getElementById('modalDayOfWeekLabel').innerText = `${dayNamesDE[dt.getDay()]}, ${d}. ${monthNames[m - 1]} ${y}`;
+
+            const yearData = getYearData(y);
+            const entry = yearData[isoDate] || {
+                status: isWeekend ? 'Wochenende' : 'Büro',
+                start: '', end: '', breakMin: 0, sollHours: isWeekend ? 0.0 : 8.0, note: ''
+            };
+
+            document.getElementById('modalStatus').value = entry.status || (isWeekend ? 'Wochenende' : 'Büro');
+            document.getElementById('modalStart').value = entry.start || '';
+            document.getElementById('modalEnd').value = entry.end || '';
+            document.getElementById('modalBreak').value = entry.breakMin !== undefined ? entry.breakMin : 0;
+            document.getElementById('modalSoll').value = entry.sollHours !== undefined ? entry.sollHours : (isWeekend ? 0.0 : 8.0);
+            document.getElementById('modalNote').value = entry.note || '';
+
+            handleStatusChange();
+            calculateModalDiff();
+        }
+
+        function closeModal() {
+            document.getElementById('entryModal').classList.add('hidden');
+        }
+
+        function handleStatusChange() {
+            const status = document.getElementById('modalStatus').value;
+            if (status === 'Wochenende' || status === 'Feiertag') {
+                document.getElementById('modalSoll').value = 0.0;
+            } else if (status === 'Urlaub' || status === 'Krankheit' || status === 'Zeitausgleich') {
+                if (parseFloat(document.getElementById('modalSoll').value) === 0) {
+                    document.getElementById('modalSoll').value = 8.0;
+                }
+            }
+            calculateModalDiff();
+        }
+
+        function calculateModalDiff() {
+            const status = document.getElementById('modalStatus').value;
+            const start = document.getElementById('modalStart').value;
+            const end = document.getElementById('modalEnd').value;
+            const breakM = parseInt(document.getElementById('modalBreak').value) || 0;
+            const soll = parseFloat(document.getElementById('modalSoll').value) || 0.0;
+
+            let ist = 0.0;
+            if (status === 'Urlaub' || status === 'Krankheit') {
+                ist = soll;
+            } else if (start && end) {
+                ist = calculateIstHours(start, end, breakM);
+            }
+
+            const diff = ist - soll;
+            document.getElementById('modalIstDisplay').innerText = `${ist.toFixed(1)} h`;
+            
+            const diffDisplay = document.getElementById('modalDiffDisplay');
+            diffDisplay.innerText = `${diff >= 0 ? '+' : ''}${diff.toFixed(1)} h`;
+            if (diff > 0) diffDisplay.className = "block font-extrabold text-sm text-emerald-600 dark:text-emerald-400 mt-1";
+            else if (diff < 0) diffDisplay.className = "block font-extrabold text-sm text-rose-600 dark:text-rose-400 mt-1";
+            else diffDisplay.className = "block font-extrabold text-sm text-slate-400 dark:text-slate-500 mt-1";
+        }
+
+        function saveModalEntry(e) {
+            e.preventDefault();
+
+            const iso = document.getElementById('modalDateInput').value;
+            if (!iso) return;
+
+            const [y, m, d] = iso.split('-').map(Number);
+            const yearData = getYearData(y);
+
+            const status = document.getElementById('modalStatus').value;
+            const start = document.getElementById('modalStart').value;
+            const end = document.getElementById('modalEnd').value;
+            const breakMin = parseInt(document.getElementById('modalBreak').value) || 0;
+            const sollHours = parseFloat(document.getElementById('modalSoll').value) || 0.0;
+            const note = document.getElementById('modalNote').value;
+
+            let istHours = 0.0;
+            if (status === 'Urlaub' || status === 'Krankheit') {
+                istHours = sollHours;
+            } else if (start && end) {
+                istHours = calculateIstHours(start, end, breakMin);
+            }
+
+            yearData[iso] = { status, start, end, breakMin, sollHours, istHours, note };
+
+            currentMonth = m - 1;
+            saveFullDatabase();
+            closeModal();
+            renderMonthTabs();
+            renderCurrentView();
+            showToast(`Zeiten für den ${d}.${m}.${y} gespeichert!`, 'success');
+        }
+
+        function clearDayEntry() {
+            const iso = document.getElementById('modalDateInput').value;
+            if (!iso) return;
+
+            const [y, m, d] = iso.split('-').map(Number);
+            const yearData = getYearData(y);
+            const dt = new Date(y, m - 1, d);
+            const isWeekend = (dt.getDay() === 0 || dt.getDay() === 6);
+
+            yearData[iso] = {
+                status: isWeekend ? 'Wochenende' : 'Offen',
+                start: '', end: '', breakMin: 0, sollHours: isWeekend ? 0.0 : 8.0, istHours: 0.0, note: ''
+            };
+
+            saveFullDatabase();
+            closeModal();
+            renderCurrentView();
+            showToast(`Eintrag für ${d}.${m}.${y} geleert`, "info");
+        }
+
+        function openCopyModalFromEntryModal() {
+            const iso = document.getElementById('modalDateInput').value;
+            if (!iso) return;
+
+            const status = document.getElementById('modalStatus').value;
+            const start = document.getElementById('modalStart').value;
+            const end = document.getElementById('modalEnd').value;
+            const breakMin = parseInt(document.getElementById('modalBreak').value) || 0;
+            const sollHours = parseFloat(document.getElementById('modalSoll').value) || 0.0;
+            const note = document.getElementById('modalNote').value;
+
+            let istHours = (status === 'Urlaub' || status === 'Krankheit') ? sollHours : (start && end ? calculateIstHours(start, end, breakMin) : 0.0);
+
+            copySourceData = { sourceIso: iso, status, start, end, breakMin, sollHours, istHours, note };
+
+            closeModal();
+            openCopyModal();
+        }
+
+        function openCopyModalDirect(iso) {
+            const [y] = iso.split('-').map(Number);
+            const yearData = getYearData(y);
+            const entry = yearData[iso] || { status: 'Büro', start: '08:00', end: '16:30', breakMin: 30, sollHours: 8.0, istHours: 8.0, note: '' };
+
+            copySourceData = {
+                sourceIso: iso,
+                status: entry.status || 'Büro',
+                start: entry.start || '',
+                end: entry.end || '',
+                breakMin: entry.breakMin || 0,
+                sollHours: entry.sollHours !== undefined ? entry.sollHours : 8.0,
+                istHours: entry.istHours || 0.0,
+                note: entry.note || ''
+            };
+
+            openCopyModal();
+        }
+
+        function openCopyModal() {
+            if (!copySourceData) return;
+
+            const modal = document.getElementById('copyModal');
+            const [y, m, d] = copySourceData.sourceIso.split('-').map(Number);
+            const dt = new Date(y, m - 1, d);
+            const dayName = dayNamesDE[dt.getDay()];
+
+            document.getElementById('copySourceLabel').innerText = `Kopiere Quell-Tag: ${dayName}, ${d}. ${monthNames[m - 1]} ${y}`;
+
+            let timeSummary = copySourceData.start && copySourceData.end ? `${copySourceData.start} - ${copySourceData.end} (${copySourceData.breakMin}m Pause)` : 'Keine Zeiten';
+            document.getElementById('copySummaryBadge').innerHTML = `
+                <div class="flex items-center justify-between font-bold text-slate-800 dark:text-slate-100">
+                    <span>Kategorie: <span class="text-indigo-600 dark:text-indigo-400">${copySourceData.status}</span></span>
+                    <span>Zeiten: ${timeSummary}</span>
+                </div>
+                ${copySourceData.note ? `<div class="text-[11px] text-slate-500 dark:text-slate-400 mt-1 truncate">Notiz: "${copySourceData.note}"</div>` : ''}
+            `;
+
+            document.getElementById('presetSameDayBtn').innerText = `📆 Alle ${dayName}e im ${monthNames[m - 1]}`;
+
+            renderCopyDaysGrid();
+            modal.classList.remove('hidden');
+        }
+
+        function closeCopyModal() {
+            document.getElementById('copyModal').classList.add('hidden');
+        }
+
+        function renderCopyDaysGrid() {
+            const container = document.getElementById('copyDaysGrid');
+            container.innerHTML = '';
+
+            const [y, m] = copySourceData.sourceIso.split('-').map(Number);
+            const totalDays = getDaysInMonth(y, m - 1);
+            const hessenHolidays = getHessenHolidays(y);
+            const yearData = getYearData(y);
+
+            for (let d = 1; d <= totalDays; d++) {
+                const targetIso = formatDateISO(y, m - 1, d);
+                const dt = new Date(y, m - 1, d);
+                const dayOfWeek = dt.getDay();
+                const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+                const isHoliday = !!hessenHolidays[targetIso];
+                const isSource = (targetIso === copySourceData.sourceIso);
+
+                const div = document.createElement('label');
+                let rowBg = 'bg-white dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 border-slate-200 dark:border-slate-700';
+                if (isSource) rowBg = 'bg-indigo-50/80 dark:bg-indigo-950/80 border-indigo-300 dark:border-indigo-800 opacity-60';
+                else if (isHoliday) rowBg = 'bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 border-rose-200 dark:border-rose-900';
+                else if (isWeekend) rowBg = 'bg-slate-100/90 dark:bg-slate-900/90 hover:bg-slate-200 border-slate-200 dark:border-slate-800';
+
+                div.className = `flex items-center justify-between p-2 rounded-lg border text-xs cursor-pointer transition select-none ${rowBg}`;
+
+                const dateText = `${dayNamesDE[dayOfWeek].substring(0, 2)}, ${String(d).padStart(2, '0')}.${String(m).padStart(2, '0')}.${y}`;
+                const currentStatus = yearData[targetIso]?.status || (isWeekend ? 'Wochenende' : 'Offen');
+
+                div.innerHTML = `
+                    <div class="flex items-center space-x-2.5">
+                        <input type="checkbox" value="${targetIso}" onchange="updateCopyCounter()" ${isSource ? 'disabled' : ''} class="copy-day-checkbox w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer">
+                        <span class="font-semibold text-slate-800 dark:text-slate-200">${dateText} ${isSource ? '<span class="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold ml-1">(Quelle)</span>' : ''}</span>
+                    </div>
+                    <span class="text-[11px] text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700/50 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-600">${currentStatus}</span>
+                `;
+
+                container.appendChild(div);
+            }
+
+            presetCopySelection('week_workdays');
+        }
+
+        function presetCopySelection(type) {
+            const [y, m, d] = copySourceData.sourceIso.split('-').map(Number);
+            const sourceDt = new Date(y, m - 1, d);
+            const sourceDayOfWeek = sourceDt.getDay();
+            const sourceKw = getISOWeek(sourceDt);
+
+            const checkboxes = document.querySelectorAll('.copy-day-checkbox');
+
+            checkboxes.forEach(cb => {
+                if (cb.disabled) {
+                    cb.checked = false;
+                    return;
+                }
+
+                const targetIso = cb.value;
+                const [ty, tm, td] = targetIso.split('-').map(Number);
+                const targetDt = new Date(ty, tm - 1, td);
+                const targetDayOfWeek = targetDt.getDay();
+                const isWeekend = (targetDayOfWeek === 0 || targetDayOfWeek === 6);
+                const targetKw = getISOWeek(targetDt);
+
+                if (type === 'clear_all') cb.checked = false;
+                else if (type === 'week_workdays') cb.checked = (targetKw === sourceKw && !isWeekend);
+                else if (type === 'rest_of_week') cb.checked = (targetKw === sourceKw && !isWeekend && td > d);
+                else if (type === 'same_day_of_month') cb.checked = (targetDayOfWeek === sourceDayOfWeek);
+                else if (type === 'month_workdays') cb.checked = !isWeekend;
+            });
+
+            updateCopyCounter();
+        }
+
+        function updateCopyCounter() {
+            const checkedCount = document.querySelectorAll('.copy-day-checkbox:checked').length;
+            document.getElementById('selectedDaysCounter').innerText = `${checkedCount} Tag${checkedCount === 1 ? '' : 'e'} gewählt`;
+            document.getElementById('copyApplyBtnText').innerText = `Auf ${checkedCount} ausgewählte Tage anwenden`;
+        }
+
+        function executeCopyData() {
+            if (!copySourceData) return;
+
+            const [srcY] = copySourceData.sourceIso.split('-').map(Number);
+            const srcYearData = getYearData(srcY);
+
+            srcYearData[copySourceData.sourceIso] = {
+                status: copySourceData.status,
+                start: copySourceData.start,
+                end: copySourceData.end,
+                breakMin: copySourceData.breakMin,
+                sollHours: copySourceData.sollHours,
+                istHours: copySourceData.istHours,
+                note: copySourceData.note
+            };
+
+            const checkboxes = document.querySelectorAll('.copy-day-checkbox:checked');
+            let appliedCount = 1;
+
+            checkboxes.forEach(cb => {
+                const targetIso = cb.value;
+                const [y] = targetIso.split('-').map(Number);
+                const yearData = getYearData(y);
+
+                yearData[targetIso] = {
+                    status: copySourceData.status,
+                    start: copySourceData.start,
+                    end: copySourceData.end,
+                    breakMin: copySourceData.breakMin,
+                    sollHours: copySourceData.sollHours,
+                    istHours: copySourceData.istHours,
+                    note: copySourceData.note
+                };
+                appliedCount++;
+            });
+
+            saveFullDatabase();
+            closeCopyModal();
+            renderCurrentView();
+            showToast(`Einstellungen auf Quell-Tag und ${appliedCount - 1} weitere Tage kopiert!`, 'success');
+        }
+
+        function openVacationPeriodModal() {
+            const startInput = document.getElementById('vacationStartInput');
+            const endInput = document.getElementById('vacationEndInput');
+            
+            startInput.value = `${currentYear}-07-01`;
+            endInput.value = `${currentYear}-07-14`;
+            document.getElementById('vacationStatusSelect').value = 'Urlaub';
+            document.getElementById('vacationNoteInput').value = 'Sommerurlaub';
+
+            previewVacationDaysCount();
+            document.getElementById('vacationPeriodModal').classList.remove('hidden');
+        }
+
+        function closeVacationPeriodModal() {
+            document.getElementById('vacationPeriodModal').classList.add('hidden');
+        }
+
+        function previewVacationDaysCount() {
+            const startStr = document.getElementById('vacationStartInput').value;
+            const endStr = document.getElementById('vacationEndInput').value;
+            const display = document.getElementById('vacationDaysPreview');
+
+            if (!startStr || !endStr) {
+                display.innerText = '0 Tage';
+                return;
+            }
+
+            const startDate = new Date(startStr);
+            const endDate = new Date(endStr);
+
+            if (startDate > endDate) {
+                display.innerText = 'Ungültiger Zeitraum (Start > Ende)';
+                display.className = "text-sm text-rose-600 dark:text-rose-400 font-extrabold";
+                return;
+            }
+
+            const hessenHolidays = getHessenHolidays(currentYear);
+            let count = 0;
+
+            let cur = new Date(startDate);
+            while (cur <= endDate) {
+                const year = cur.getFullYear();
+                if (year === currentYear) {
+                    const month = String(cur.getMonth() + 1).padStart(2, '0');
+                    const day = String(cur.getDate()).padStart(2, '0');
+                    const iso = `${year}-${month}-${day}`;
+                    const dayOfWeek = cur.getDay();
+
+                    const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+                    const isHoliday = !!hessenHolidays[iso];
+
+                    if (!isWeekend && !isHoliday) count++;
+                }
+                cur.setDate(cur.getDate() + 1);
+            }
+
+            display.innerText = `${count} Tag${count === 1 ? '' : 'e'} (ohne Sa/So/Feiertage)`;
+            display.className = "text-sm text-amber-900 dark:text-amber-200 font-extrabold";
+        }
+
+        function saveVacationPeriod(e) {
+            e.preventDefault();
+
+            const startStr = document.getElementById('vacationStartInput').value;
+            const endStr = document.getElementById('vacationEndInput').value;
+            const status = document.getElementById('vacationStatusSelect').value;
+            const note = document.getElementById('vacationNoteInput').value.trim() || status;
+
+            if (!startStr || !endStr) return;
+
+            const startDate = new Date(startStr);
+            const endDate = new Date(endStr);
+
+            if (startDate > endDate) {
+                showToast('Startdatum muss vor Enddatum liegen!', 'info');
+                return;
+            }
+
+            const hessenHolidays = getHessenHolidays(currentYear);
+            let bookedCount = 0;
+
+            let cur = new Date(startDate);
+            while (cur <= endDate) {
+                const year = cur.getFullYear();
+                const yearData = getYearData(year);
+
+                const month = String(cur.getMonth() + 1).padStart(2, '0');
+                const day = String(cur.getDate()).padStart(2, '0');
+                const iso = `${year}-${month}-${day}`;
+                const dayOfWeek = cur.getDay();
+
+                const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+                const isHoliday = !!hessenHolidays[iso];
+
+                if (!isWeekend && !isHoliday) {
+                    let sollH = 8.0;
+                    let istH = (status === 'Urlaub' || status === 'Krankheit') ? 8.0 : 0.0;
+
+                    yearData[iso] = { status, start: '', end: '', breakMin: 0, sollHours: sollH, istHours: istH, note };
+                    bookedCount++;
+                }
+                cur.setDate(cur.getDate() + 1);
+            }
+
+            saveFullDatabase();
+            closeVacationPeriodModal();
+            renderCurrentView();
+            showToast(`${bookedCount} Tage (${status}) verbucht!`, 'success');
+        }
+
+        function openResetConfirmModal() {
+            document.getElementById('resetYearDisplay').innerText = currentYear;
+            document.getElementById('confirmModal').classList.remove('hidden');
+        }
+
+        function closeResetConfirmModal() {
+            document.getElementById('confirmModal').classList.add('hidden');
+        }
+
+        function executeResetData() {
+            timelogDB.years[currentYear.toString()] = generateCleanSeedDataForYear(currentYear);
+            saveFullDatabase();
+            closeResetConfirmModal();
+            renderCurrentView();
+            showToast(`Einträge für ${currentYear} zurückgesetzt`, "info");
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            
+            let bg = 'bg-slate-900 text-white';
+            if (type === 'success') bg = 'bg-emerald-600 text-white';
+            if (type === 'info') bg = 'bg-indigo-600 text-white';
+
+            toast.className = `px-4 py-3 rounded-xl shadow-lg text-xs font-semibold flex items-center space-x-2 transition-all duration-300 transform translate-y-2 opacity-0 pointer-events-auto ${bg}`;
+            toast.innerHTML = `<i class="fa-solid fa-circle-check"></i><span>${message}</span>`;
+            
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            }, 10);
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        window.onload = function() {
+            initTheme();
+            loadFullDatabase();
+            changeYear(2026);
+        };
+    </script>
+</body>
+</html>

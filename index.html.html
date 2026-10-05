@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TimeLog – Arbeitszeiterfassung</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    // Automatische Weiterleitung nach Bildschirmbreite (nur wenn kein Parameter in der URL steht)
+    const urlParams = new URLSearchParams(window.location.search);
+    if (!urlParams.has('select')) {
+      if (window.innerWidth < 768) {
+        window.location.href = "mobile.html";
+      } else {
+        window.location.href = "desktop.html";
+      }
+    }
+  </script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex items-center justify-center p-4 font-sans">
+  <div class="max-w-md w-full bg-slate-800 p-8 rounded-2xl border border-slate-700 shadow-xl text-center">
+    <h1 class="text-2xl font-bold mb-2 text-indigo-400">⏱️ TimeLog v1.3.0</h1>
+    <p class="text-slate-400 text-sm mb-6">Wähle die passende Version für dein Gerät:</p>
+    
+    <div class="space-y-4">
+      <a href="mobile.html" class="block w-full py-3.5 px-4 bg-indigo-600 hover:bg-indigo-500 rounded-xl font-semibold transition text-white shadow-md">
+        📱 Mobile Version öffnen
+      </a>
+      <a href="desktop.html" class="block w-full py-3.5 px-4 bg-slate-700 hover:bg-slate-600 rounded-xl font-semibold transition text-slate-200 border border-slate-600">
+        💻 Desktop Version öffnen
+      </a>
+    </div>
+  </div>
+</body>
+</html>
